@@ -1,0 +1,11 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.santosh.stockhawk.activity.StocksActivity">
+    <item
+        android:id="@+id/action_stock_change"
+        android:icon="@drawable/ic_dollar"
+        android:orderInCategory="100"
+        android:title="Display Mode"
+        app:showAsAction="always" />
+</menu>
