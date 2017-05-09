@@ -2,22 +2,21 @@ package com.santosh.stockhawk.fragment;
 
 
 import android.app.Dialog;
-import android.content.BroadcastReceiver;
+import android.appwidget.AppWidgetManager;
+import android.content.AsyncQueryHandler;
+import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.LoaderManager;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
-import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -35,85 +34,120 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.gcm.GcmNetworkManager;
+import com.google.android.gms.gcm.PeriodicTask;
+import com.google.android.gms.gcm.Task;
 import com.santosh.stockhawk.R;
-import com.santosh.stockhawk.adapter.StockAdapter;
-import com.santosh.stockhawk.data.Contract;
-import com.santosh.stockhawk.data.PrefUtils;
-import com.santosh.stockhawk.sync.QuoteSyncJob;
+import com.santosh.stockhawk.activity.StockDetailActivity;
+import com.santosh.stockhawk.activity.StocksActivity;
+import com.santosh.stockhawk.adapter.RecyclerViewItemClickListener;
+import com.santosh.stockhawk.adapter.StockCursorAdapter;
+import com.santosh.stockhawk.adapter.Utils;
+import com.santosh.stockhawk.data.StockContract;
+import com.santosh.stockhawk.data.StockProvider;
+import com.santosh.stockhawk.service.StockIntentService;
+import com.santosh.stockhawk.service.StockTaskService;
+import com.santosh.stockhawk.touch_events.SimpleItemTouchHelperCallback;
+import com.santosh.stockhawk.widget.StockWidgetProvider;
 
-import static com.santosh.stockhawk.activity.StocksActivity.NO_STOCK;
+public class StocksFragment extends Fragment implements
+        SwipeRefreshLayout.OnRefreshListener, View.OnClickListener, android.support.v4.app.LoaderManager.LoaderCallbacks<Cursor> {
 
-public class StocksFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor>,
-        SwipeRefreshLayout.OnRefreshListener, View.OnClickListener {
-
-    private static final int STOCK_LOADER = 0;
+    int symbolColumnIndex, nameColoumIndex, currencyColoumIndex, lasttradedateColoumIndex,
+            daylowColoumIndex, dayhighColoumIndex, yearlowColoumIndex, yearhighColoumIndex;
     private View errorLayout;
     private FloatingActionButton addStock;
     private Context context;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private StockAdapter stockAdapter;
-    private BroadcastReceiver noStockReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String symbol = intent.getExtras().getString("symbol");
-            PrefUtils.removeStock(context, symbol);
-            stockAdapter.notifyDataSetChanged();
-            Toast.makeText(StocksFragment.this.context, "No Stock found, Please a enter a valid stock name", Toast.LENGTH_SHORT).show();
-        }
-    };
+    private StockCursorAdapter stockAdapter;
+    private Cursor mCursor;
     private RecyclerView stockRecyclerView;
+    private Intent mServiceIntent;
+    private int SYMBOL_SEARCH_QUERY_TAG;
+    private boolean mTwoPane;
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.stocks_fragment, container, false);
-        boolean mTwoPane = getArguments().getBoolean("mTwoPane");
-        initView(view, mTwoPane);
+        mTwoPane = getArguments().getBoolean("mTwoPane");
+        initView(view);
         onRefresh();
-        QuoteSyncJob.initialize(context);
         setHasOptionsMenu(true);
+        boolean isConnected = Utils.isNetworkAvailable(context);
+        mServiceIntent = new Intent(context, StockIntentService.class);
+        if (savedInstanceState == null) {
+            mServiceIntent.putExtra("tag", "init");
+            if (isConnected) {
+                context.startService(mServiceIntent);
+            } else {
+                setLayout();
+            }
+        }
+        int CURSOR_LOADER_ID = 2546;
+        getLoaderManager().initLoader(CURSOR_LOADER_ID, null, this);
+        startPeriodicTask();
         return view;
     }
 
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        LocalBroadcastManager.getInstance(context).registerReceiver(noStockReceiver, new IntentFilter(NO_STOCK));
+    private void startPeriodicTask() {
+        if (Utils.isNetworkAvailable(context)) {
+            long period = 3600L;
+            long flex = 10L;
+            String periodicTag = "periodic";
+
+            PeriodicTask periodicTask = new PeriodicTask.Builder()
+                    .setService(StockTaskService.class)
+                    .setPeriod(period)
+                    .setFlex(flex)
+                    .setTag(periodicTag)
+                    .setRequiredNetwork(Task.NETWORK_STATE_CONNECTED)
+                    .setRequiresCharging(false)
+                    .build();
+            GcmNetworkManager.getInstance(context).schedule(periodicTask);
+
+        }
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        LocalBroadcastManager.getInstance(context).unregisterReceiver(noStockReceiver);
-    }
-
-    private void initView(View view, boolean mTwoPane) {
-        stockAdapter = new StockAdapter(context, mTwoPane);
+    private void initView(View view) {
         stockRecyclerView = (RecyclerView) view.findViewById(R.id.stocks_recycler_view);
         stockRecyclerView.setLayoutManager(new LinearLayoutManager(context));
-        stockRecyclerView.setAdapter(stockAdapter);
         swipeRefreshLayout = (SwipeRefreshLayout) view.findViewById(R.id.swipe_refresh_layout);
         swipeRefreshLayout.setOnRefreshListener(this);
         swipeRefreshLayout.setRefreshing(true);
         errorLayout = view.findViewById(R.id.errorLayout);
         addStock = (FloatingActionButton) view.findViewById(R.id.add_stock);
         addStock.setOnClickListener(this);
-        getActivity().getSupportLoaderManager().initLoader(STOCK_LOADER, null, this);
+        stockAdapter = new StockCursorAdapter(context, null);
+        stockRecyclerView.addOnItemTouchListener(new RecyclerViewItemClickListener(context,
+                new RecyclerViewItemClickListener.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(View v, int position) {
+                        if (mCursor.moveToPosition(position)) {
+                            Intent intent = new Intent(getActivity(), StockDetailActivity.class);
+                            Bundle bundle = new Bundle();
+                            bundle.putString("symbol_name", mCursor.getString(symbolColumnIndex));
+                            bundle.putString("name", mCursor.getString(nameColoumIndex));
+                            bundle.putString("currency", mCursor.getString(currencyColoumIndex));
+                            bundle.putString("lasttradedate", mCursor.getString(lasttradedateColoumIndex));
+                            bundle.putString("daylow", mCursor.getString(daylowColoumIndex));
+                            bundle.putString("dayhigh", mCursor.getString(dayhighColoumIndex));
+                            bundle.putString("yearlow", mCursor.getString(yearlowColoumIndex));
+                            bundle.putString("yearhigh", mCursor.getString(yearhighColoumIndex));
+                            if (mTwoPane) {
+                                StockDetailFragment fragment = new StockDetailFragment();
+                                fragment.setArguments(bundle);
+                                ((StocksActivity) context).getSupportFragmentManager().beginTransaction().replace(R.id.stocks_detail_container, fragment).commit();
+                            } else {
+                                intent.putExtra("data", bundle);
+                                context.startActivity(intent);
+                            }
+                        }
+                    }
+                }));
 
-        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
-                return false;
-            }
-
-            @Override
-            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
-                String symbol = stockAdapter.getSymbolAtPosition(viewHolder.getAdapterPosition());
-                PrefUtils.removeStock(context, symbol);
-                int i = getActivity().getContentResolver().delete(Contract.Quote.makeUriForStock(symbol), null, null);
-                if (PrefUtils.getStocksCount(context) == 0) {
-                    setLayout();
-                }
-            }
-        }).attachToRecyclerView(stockRecyclerView);
+        stockRecyclerView.setAdapter(stockAdapter);
+        ItemTouchHelper.Callback callback = new SimpleItemTouchHelperCallback(stockAdapter);
+        ItemTouchHelper mItemTouchHelper = new ItemTouchHelper(callback);
+        mItemTouchHelper.attachToRecyclerView(stockRecyclerView);
     }
 
     @Override
@@ -140,7 +174,7 @@ public class StocksFragment extends Fragment implements LoaderManager.LoaderCall
 
     private boolean networkUp() {
         ConnectivityManager cm =
-                (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         return networkInfo != null && networkInfo.isConnectedOrConnecting();
     }
@@ -149,28 +183,22 @@ public class StocksFragment extends Fragment implements LoaderManager.LoaderCall
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_stock_change:
-                PrefUtils.toggleDisplayMode(context);
+                Utils.showPercent = !Utils.showPercent;
+                context.getContentResolver().notifyChange(StockProvider.Quotes.CONTENT_URI, null);
                 setDisplayModeMenuItemIcon(item);
-                stockAdapter.notifyDataSetChanged();
                 return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
     private void setDisplayModeMenuItemIcon(MenuItem item) {
-        if (PrefUtils.getDisplayMode(context)
-                .equals(getString(R.string.pref_display_mode_absolute_key))) {
+        if (Utils.showPercent) {
             item.setIcon(R.drawable.ic_percentage);
         } else {
             item.setIcon(R.drawable.ic_dollar);
         }
     }
 
-    @Override
-    public void onRefresh() {
-        QuoteSyncJob.syncImmediately(context);
-        setLayout();
-    }
 
     private void setLayout() {
         if (!networkUp() && stockAdapter.getItemCount() == 0) {
@@ -183,7 +211,7 @@ public class StocksFragment extends Fragment implements LoaderManager.LoaderCall
             errorLayout.setVisibility(View.VISIBLE);
             ((TextView) errorLayout.findViewById(R.id.errorText)).setText(R.string.no_network);
             ((ImageView) errorLayout.findViewById(R.id.errorImage)).setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_wifi_off_black_48dp));
-        } else if (PrefUtils.getStocks(context).size() == 0) {
+        } else if (stockAdapter.getItemCount() == 0) {
             swipeRefreshLayout.setRefreshing(false);
             errorLayout.setVisibility(View.VISIBLE);
             addStock.setVisibility(View.VISIBLE);
@@ -201,37 +229,65 @@ public class StocksFragment extends Fragment implements LoaderManager.LoaderCall
         if (symbol != null && !symbol.isEmpty()) {
             if (networkUp()) {
                 swipeRefreshLayout.setRefreshing(true);
+                SymbolQuery symbolQuery = new SymbolQuery(context.getContentResolver(), symbol);
+                symbolQuery.startQuery(SYMBOL_SEARCH_QUERY_TAG,
+                        null,
+                        StockProvider.Quotes.CONTENT_URI,
+                        new String[]{StockContract.SYMBOL},
+                        StockContract.SYMBOL + "=?",
+                        new String[]{symbol},
+                        null);
             } else {
+                swipeRefreshLayout.setRefreshing(false);
                 String message = getString(R.string.toast_stock_added_no_connectivity, symbol);
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show();
             }
-            PrefUtils.addStock(context, symbol);
-            QuoteSyncJob.syncImmediately(context);
         }
     }
-
 
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         return new CursorLoader(context,
-                Contract.Quote.URI,
-                Contract.Quote.QUOTE_COLUMNS,
-                null, null, Contract.Quote.COLUMN_SYMBOL);
+                StockProvider.Quotes.CONTENT_URI,
+                new String[]{StockContract._ID, StockContract.SYMBOL, StockContract.BID_PRICE,
+                        StockContract.PERCENT_CHANGE, StockContract.CHANGE, StockContract.IS_UP, StockContract.NAME, StockContract.CURRENCY,
+                        StockContract.LAST_TRADE_DATE, StockContract.DAY_LOW, StockContract.DAY_HIGH, StockContract.YEAR_LOW, StockContract.YEAR_HIGH,
+                },
+                StockContract.IS_CURRENT + " = ?",
+                new String[]{"1"},
+                null);
     }
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         swipeRefreshLayout.setRefreshing(false);
-        stockAdapter.setCursor(data);
-        if (errorLayout.getVisibility() == View.VISIBLE) {
-            setLayout();
-        }
+        stockAdapter.swapCursor(data);
+        mCursor = data;
+        symbolColumnIndex = mCursor.getColumnIndex(StockContract.SYMBOL);
+        nameColoumIndex = mCursor.getColumnIndex(StockContract.NAME);
+        currencyColoumIndex = mCursor.getColumnIndex(StockContract.CURRENCY);
+        lasttradedateColoumIndex = mCursor.getColumnIndex(StockContract.LAST_TRADE_DATE);
+        daylowColoumIndex = mCursor.getColumnIndex(StockContract.DAY_LOW);
+        dayhighColoumIndex = mCursor.getColumnIndex(StockContract.DAY_HIGH);
+        yearlowColoumIndex = mCursor.getColumnIndex(StockContract.YEAR_LOW);
+        yearhighColoumIndex = mCursor.getColumnIndex(StockContract.YEAR_HIGH);
+        setLayout();
+        updateStocksWidget();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(android.support.v4.content.Loader<Cursor> loader) {
+        stockAdapter.swapCursor(null);
         swipeRefreshLayout.setRefreshing(false);
-        stockAdapter.setCursor(null);
+        setLayout();
+    }
+
+    private void updateStocksWidget() {
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context.getApplicationContext());
+        int[] ids = appWidgetManager.getAppWidgetIds(new ComponentName(context, StockWidgetProvider.class));
+        if (ids.length > 0) {
+            appWidgetManager.notifyAppWidgetViewDataChanged(ids, R.id.lv_stock_widget_layout);
+        }
     }
 
     @Override
@@ -265,6 +321,35 @@ public class StocksFragment extends Fragment implements LoaderManager.LoaderCall
             dialog.setCanceledOnTouchOutside(false);
             dialog.show();
             dialog.getWindow().setAttributes(lp);
+        }
+    }
+
+    @Override
+    public void onRefresh() {
+
+    }
+
+    private class SymbolQuery extends AsyncQueryHandler {
+
+        String symbol;
+
+        SymbolQuery(ContentResolver cr, String symbol) {
+            super(cr);
+            this.symbol = symbol;
+        }
+
+        @Override
+        protected void onQueryComplete(int token, Object cookie, Cursor cursor) {
+            if (token == SYMBOL_SEARCH_QUERY_TAG) {
+                if (cursor != null && cursor.getCount() != 0) {
+                    setLayout();
+                } else {
+                    mServiceIntent.putExtra("tag", "add");
+                    mServiceIntent.putExtra("symbol", this.symbol);
+                    context.startService(mServiceIntent);
+                    updateStocksWidget();
+                }
+            }
         }
     }
 }

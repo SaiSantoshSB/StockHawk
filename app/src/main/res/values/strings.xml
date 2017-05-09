@@ -4,16 +4,61 @@
 
     <string name="pref_stocks_initialized_key" translatable="false">initialized</string>
 
-    <string name="pref_stocks_key">stocks</string>
+    <string name="pref_stocks_key" translatable="true">stocks</string>
 
 
-    <string name="pref_display_mode_key">displayMode</string>
-    <string name="pref_display_mode_default">@string/pref_display_mode_percentage_key</string>
+    <string name="pref_display_mode_key" translatable="true">displayMode</string>
+    <string name="pref_display_mode_default" translatable="true">@string/pref_display_mode_percentage_key</string>
 
-    <string name="pref_display_mode_absolute_key">absolute</string>
-    <string name="pref_display_mode_percentage_key">percentage</string>
-    <string name="error_description">Error description</string>
-    <string name="no_network">Please Check your Network Connection</string>
-    <string name="no_stocks">Please Add a stock by pressing the add button at bottom right corner</string>
-    <string name="toast_stock_added_no_connectivity">Symbol %s added. Will refresh when network available.</string>
+    <string name="pref_display_mode_absolute_key" translatable="true">absolute</string>
+    <string name="pref_display_mode_percentage_key" translatable="true">percentage</string>
+    <string name="error_description" translatable="true">Error description</string>
+    <string name="no_network" translatable="true">Please Check your Network Connection</string>
+    <string name="no_stocks" translatable="true">Please Add a stock by pressing the add button at bottom right corner</string>
+    <string name="toast_stock_added_no_connectivity" translatable="true">Symbol %s added. Will refresh when network available.</string>
+    <string name="not_found" translatable="true">Stock symbol invalid!</string>
+    <string name="stockStatus" translatable="false">StockStatus</string>
+    <string name="historicalDataStatus" translatable="false">historical_data_status</string>
+    <string name="action_change_units" translatable="true">Change Units</string>
+    <string name="action_change_units_description" translatable="true">Change from percentage increase or decrease to actual increase or decrease</string>
+    <string name="symbol_search" translatable="true">Symbol Search</string>
+    <string name="content_test" translatable="true">Search for a Stock Symbol</string>
+    <string name="input_hint" translatable="false">MSFT / BAC / GOOG</string>
+    <string name="network_snack" translatable="true">Uh-oh! This app requires an internet connection</string>
+    <string name="already_saved" translatable="true">This stock is already saved!</string>
+    <string name="data_not_available" translatable="true">Stocks data not available, possible solution:\n</string>
+    <string name="string_status_ok" translatable="true">You need to add new stocks by clicking add button!</string>
+    <string name="string_status_no_network" translatable="true">You need to connect to internet to retrieve stock data!</string>
+    <string name="string_error_json" translatable="true">App Internal Error occurred! Sorry!</string>
+    <string name="string_server_down" translatable="true">Yahoo! Server is not responding!</string>
+    <string name="string_error_server" translatable="true">Parsing error! Sorry!</string>
+    <string name="string_status_unknown" translatable="true">We can\'t identify the problem, try again later?</string>
+    <string name="input_prefill" />
+    <string name="no_stock_bool" translatable="false">No Stock Found</string>
+    <string name="cant_fetch" translatable="true">Sorry! Could not fetch data!\n</string>
+    <string name="no_data_show" translatable="true">Can\'t show you data over time!</string>
+    <string name="retry" translatable="true">RETRY</string>
+    <string name="stock" translatable="true">Stock</string>
+    <string name="empty_view_text" translatable="true">Stocks Data not available!</string>
+    <string name="data_error_json" translatable="true">Looks like it\'s our fault!</string>
+    <string name="data_no_internet" translatable="true">Internet Connection is required!</string>
+    <string name="data_error_parse" translatable="true">Unprecedented errors have happened!</string>
+    <string name="data_unknown_error" translatable="true">Can\'t identify the problem here!</string>
+    <string name="data_server_down" translatable="true">The Yahoo! Server is not responding properly!</string>
+    <string name="data_no_error" translatable="true">No errors!</string>
+    <string name="graph_content_description" translatable="true">Graph showing prices of the stock over time!</string>
+    <string name="list_stocks" translatable="true">List of Stocks</string>
+    <string name="fab_button_content_description" translatable="true">Button to add new stock through its symbol.</string>
+    <string name="listview_widget" translatable="true">Listview in widget.</string>
+    <string name="stock_name" translatable="true">Stock Name</string>
+    <string name="stock_symbol" translatable="true">Stock Symbol</string>
+    <string name="Currency" translatable="true">Currency</string>
+    <string name="Earningsshare" translatable="true">Earning\'s Share</string>
+    <string name="Marketcaptalization" translatable="true">Market Capitalization</string>
+    <string name="Daylow" translatable="true">Day\'s low</string>
+    <string name="Dayhigh" translatable="true">Day\'s high</string>
+    <string name="Yearlow" translatable="true">Year\'s low</string>
+    <string name="Yearhigh" translatable="true">Year\'s high</string>
+    <string name="Lasttradedate" translatable="true">Last Trade Date</string>
 </resources>
+

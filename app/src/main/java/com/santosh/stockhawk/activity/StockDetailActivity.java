@@ -14,12 +14,10 @@ public class StockDetailActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_detail);
+        setContentView(R.layout.stocks_detail_activty);
         setupAppBar();
         StockDetailFragment detailFragment = new StockDetailFragment();
-        Bundle bundle = new Bundle();
-        bundle.putParcelable("data", getIntent().getExtras().getParcelable("data"));
-        detailFragment.setArguments(bundle);
+        detailFragment.setArguments(getIntent().getBundleExtra("data"));
         getSupportFragmentManager().beginTransaction().replace(R.id.stocks_detail_container, detailFragment).commit();
     }
 

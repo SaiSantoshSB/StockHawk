@@ -1,24 +1,17 @@
 package com.santosh.stockhawk.activity;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
-import android.widget.Toast;
 
 import com.santosh.stockhawk.R;
 import com.santosh.stockhawk.fragment.StockDetailFragment;
 import com.santosh.stockhawk.fragment.StocksFragment;
 
-public class StocksActivity extends AppCompatActivity {
-
-    public final static String NO_STOCK = "no stock found";
-
+public class StocksActivity extends AppCompatActivity{
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

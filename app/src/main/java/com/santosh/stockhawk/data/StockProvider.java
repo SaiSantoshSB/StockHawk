@@ -1,181 +1,47 @@
 package com.santosh.stockhawk.data;
 
-import android.content.ContentProvider;
-import android.content.ContentValues;
-import android.content.UriMatcher;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 
+import net.simonvt.schematic.annotation.ContentProvider;
+import net.simonvt.schematic.annotation.ContentUri;
+import net.simonvt.schematic.annotation.InexactContentUri;
+import net.simonvt.schematic.annotation.TableEndpoint;
 
-public class StockProvider extends ContentProvider {
+@ContentProvider(authority = StockProvider.AUTHORITY, database = StockDatabase.class)
+public class StockProvider {
+    public static final String AUTHORITY = "com.santosh.stockhawk.data.StockProvider";
 
-    static final int QUOTE = 100;
-    static final int QUOTE_FOR_SYMBOL = 101;
+    private static final Uri BASE_CONTENT_URI = Uri.parse("content://" + AUTHORITY);
 
-    static UriMatcher uriMatcher = buildUriMatcher();
-
-    private DbHelper dbHelper;
-
-    static UriMatcher buildUriMatcher() {
-        UriMatcher matcher = new UriMatcher(UriMatcher.NO_MATCH);
-        matcher.addURI(Contract.AUTHORITY, Contract.PATH_QUOTE, QUOTE);
-        matcher.addURI(Contract.AUTHORITY, Contract.PATH_QUOTE_WITH_SYMBOL, QUOTE_FOR_SYMBOL);
-        return matcher;
-    }
-
-
-    @Override
-    public boolean onCreate() {
-        dbHelper = new DbHelper(getContext());
-        return true;
-    }
-
-    @Nullable
-    @Override
-    public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        Cursor returnCursor;
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        switch (uriMatcher.match(uri)) {
-            case QUOTE:
-                returnCursor = db.query(
-                        Contract.Quote.TABLE_NAME,
-                        projection,
-                        selection,
-                        selectionArgs,
-                        null,
-                        null,
-                        sortOrder
-                );
-                break;
-
-            case QUOTE_FOR_SYMBOL:
-                returnCursor = db.query(
-                        Contract.Quote.TABLE_NAME,
-                        projection,
-                        Contract.Quote.COLUMN_SYMBOL + " = ?",
-                        new String[]{Contract.Quote.getStockFromUri(uri)},
-                        null,
-                        null,
-                        sortOrder
-                );
-
-                break;
-            default:
-                throw new UnsupportedOperationException("Unknown URI:" + uri);
+    private static Uri buildUri(String... paths) {
+        Uri.Builder builder = BASE_CONTENT_URI.buildUpon();
+        for (String path : paths) {
+            builder.appendPath(path);
         }
-
-        returnCursor.setNotificationUri(getContext().getContentResolver(), uri);
-
-//        if (db.isOpen()) {
-//            db.close();
-//        }
-
-        return returnCursor;
+        return builder.build();
     }
 
-    @Nullable
-    @Override
-    public String getType(@NonNull Uri uri) {
-        return null;
+    interface Path {
+        String STOCKS = "stocks";
     }
 
-    @Nullable
-    @Override
-    public Uri insert(@NonNull Uri uri, ContentValues values) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        Uri returnUri;
+    @TableEndpoint(table = StockDatabase.STOCKS)
+    public static class Quotes {
+        @ContentUri(
+                path = Path.STOCKS,
+                type = "vnd.android.cursor.dir/quote"
+        )
+        public static final Uri CONTENT_URI = buildUri(Path.STOCKS);
 
-        switch (uriMatcher.match(uri)) {
-            case QUOTE:
-                db.insert(
-                        Contract.Quote.TABLE_NAME,
-                        null,
-                        values
-                );
-                returnUri = Contract.Quote.URI;
-                break;
-            default:
-                throw new UnsupportedOperationException("Unknown URI:" + uri);
+        @InexactContentUri(
+                name = "STOCk_ID",
+                path = Path.STOCKS + "/*",
+                type = "vnd.android.cursor.item/quote",
+                whereColumn = StockContract.SYMBOL,
+                pathSegment = 1
+        )
+        public static Uri withSymbol(String symbol) {
+            return buildUri(Path.STOCKS, symbol);
         }
-
-        getContext().getContentResolver().notifyChange(uri, null);
-
-
-        return returnUri;
-    }
-
-    @Override
-    public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
-        final SQLiteDatabase db = dbHelper.getWritableDatabase();
-        int rowsDeleted;
-
-        if (null == selection) {
-            selection = "1";
-        }
-        switch (uriMatcher.match(uri)) {
-            case QUOTE:
-                rowsDeleted = db.delete(
-                        Contract.Quote.TABLE_NAME,
-                        selection,
-                        selectionArgs
-                );
-
-                break;
-
-            case QUOTE_FOR_SYMBOL:
-                String symbol = Contract.Quote.getStockFromUri(uri);
-                rowsDeleted = db.delete(
-                        Contract.Quote.TABLE_NAME,
-                        '"' + symbol + '"' + " =" + Contract.Quote.COLUMN_SYMBOL,
-                        selectionArgs
-                );
-                break;
-            default:
-                throw new UnsupportedOperationException("Unknown URI:" + uri);
-        }
-
-        if (rowsDeleted != 0) {
-            getContext().getContentResolver().notifyChange(uri, null);
-        }
-        return rowsDeleted;
-    }
-
-    @Override
-    public int update(@NonNull Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        return 0;
-    }
-
-    @Override
-    public int bulkInsert(@NonNull Uri uri, @NonNull ContentValues[] values) {
-
-        final SQLiteDatabase db = dbHelper.getWritableDatabase();
-
-        switch (uriMatcher.match(uri)) {
-            case QUOTE:
-                db.beginTransaction();
-                int returnCount = 0;
-                try {
-                    for (ContentValues value : values) {
-                        db.insert(
-                                Contract.Quote.TABLE_NAME,
-                                null,
-                                value
-                        );
-                    }
-                    db.setTransactionSuccessful();
-                } finally {
-                    db.endTransaction();
-                }
-                getContext().getContentResolver().notifyChange(uri, null);
-                return returnCount;
-            default:
-                return super.bulkInsert(uri, values);
-        }
-
-
     }
 }
